@@ -4,5 +4,5 @@ metadata:
   name: datastore-be-cm
   namespace: backend
 data:
-  mysqlHost: jdbc:mysql://datastore-db.c2hw4oeumcys.us-east-1.rds.amazonaws.com:3306/datastore?createDatabaseIfNotExist=true
+  mysqlHost: jdbc:mysql://database-1.c8toe2ia46od.us-east-1.rds.amazonaws.com:3306/datastore?createDatabaseIfNotExist=true
   mysqlUname: admin
