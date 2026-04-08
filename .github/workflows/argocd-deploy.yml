@@ -2,7 +2,7 @@ name: argocd_deploy
 
 on:
   repository_dispatch:
-    types: [argocd-deploy]   # ✅ triggered explicitly by ci-cd.yml
+    types: [argocd-deploy]
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -35,16 +35,30 @@ jobs:
         run: |
           aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
 
+      # ✅ Deploy ArgoCD Apps
       - name: Deploy Backend
         run: |
           kubectl apply -f argocd/backend/argocd-backend.yaml
 
       - name: Deploy Frontend
         run: |
-          kubectl apply -f argocd/frotnend/argocd-frontend.yaml
-      - name: Deploy Ingress
+          kubectl apply -f argocd/frontend/argocd-frontend.yaml
+
+      - name: Deploy Ingress (ArgoCD App)
         run: |
           kubectl apply -f argocd/ingress/ingress.yaml
-        
-      
-      
+
+      # ✅ Install NGINX Ingress Controller (if not already)
+      - name: Install NGINX Ingress Controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+      # ✅ Apply your app ingress
+      - name: Apply App Ingress
+        run: |
+          kubectl apply -f netwroking/ingress.yaml
+
+      # ✅ Check LoadBalancer Service
+      - name: Get Ingress External IP
+        run: |
+          kubectl get svc -n ingress-nginx
