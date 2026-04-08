@@ -40,14 +40,14 @@ jobs:
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
       # =========================
-      # 🔷 BACKEND (datastore)
+      # 🔷 BACKEND (DataStore)
       # =========================
 
       # ✅ 5. Build Backend Image
       - name: Build Backend
-        run: docker build -t $BE_REPO:$IMAGE_TAG ./datastore
+        run: docker build -t $BE_REPO:$IMAGE_TAG ./DataStore
 
-      # ✅ 6. Scan Backend Image (BEFORE PUSH)
+      # ✅ 6. Scan Backend Image
       - name: Scan Backend
         uses: aquasecurity/trivy-action@master
         with:
@@ -63,14 +63,14 @@ jobs:
           docker push ${{ steps.login-ecr.outputs.registry }}/$BE_REPO:$IMAGE_TAG
 
       # =========================
-      # 🔷 FRONTEND (datastorefront)
+      # 🔷 FRONTEND (DataStoreFront)
       # =========================
 
       # ✅ 8. Build Frontend Image
       - name: Build Frontend
-        run: docker build -t $FE_REPO:$IMAGE_TAG ./datastorefront
+        run: docker build -t $FE_REPO:$IMAGE_TAG -f DataStoreFront/Dockerfile-frontend ./DataStoreFront
 
-      # ✅ 9. Scan Frontend Image (BEFORE PUSH)
+      # ✅ 9. Scan Frontend Image
       - name: Scan Frontend
         uses: aquasecurity/trivy-action@master
         with:
