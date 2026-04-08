@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: datastore.makestudio.info
+    - host: ac4bceebccb7e484589afe558175745d-994904369.us-east-1.elb.amazonaws.com
       http:
         paths:
           - path: /
