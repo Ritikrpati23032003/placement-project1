@@ -19,21 +19,23 @@ jobs:
 
     steps:
       # ✅ 1. Checkout
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      # ✅ 2. AWS Credentials
-      - uses: aws-actions/configure-aws-credentials@v3
+      # ✅ 2. Configure AWS Credentials
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          region: ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ 3. Login ECR
-      - name: Login ECR
+      # ✅ 3. Login to ECR
+      - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ✅ 4. Set Tag
+      # ✅ 4. Set Image Tag
       - name: Set Tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
@@ -41,11 +43,11 @@ jobs:
       # 🔷 BACKEND (datastore)
       # =========================
 
-      # ✅ 5. Build Backend
+      # ✅ 5. Build Backend Image
       - name: Build Backend
         run: docker build -t $BE_REPO:$IMAGE_TAG ./datastore
 
-      # ✅ 6. Scan Backend
+      # ✅ 6. Scan Backend Image (BEFORE PUSH)
       - name: Scan Backend
         uses: aquasecurity/trivy-action@master
         with:
@@ -53,7 +55,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 1
 
-      # ✅ 7. Push Backend
+      # ✅ 7. Push Backend Image
       - name: Push Backend
         run: |
           docker tag $BE_REPO:$IMAGE_TAG \
@@ -64,11 +66,11 @@ jobs:
       # 🔷 FRONTEND (datastorefront)
       # =========================
 
-      # ✅ 8. Build Frontend
+      # ✅ 8. Build Frontend Image
       - name: Build Frontend
         run: docker build -t $FE_REPO:$IMAGE_TAG ./datastorefront
 
-      # ✅ 9. Scan Frontend
+      # ✅ 9. Scan Frontend Image (BEFORE PUSH)
       - name: Scan Frontend
         uses: aquasecurity/trivy-action@master
         with:
@@ -76,7 +78,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 1
 
-      # ✅ 10. Push Frontend
+      # ✅ 10. Push Frontend Image
       - name: Push Frontend
         run: |
           docker tag $FE_REPO:$IMAGE_TAG \
@@ -98,14 +100,16 @@ jobs:
           sed -i "s|image:.*frontend.*|image: ${{ steps.login-ecr.outputs.registry }}/$FE_REPO:$IMAGE_TAG|g" frontend/datastore-fe.yaml
 
       # =========================
-      # 🟢 COMMIT BACK TO GIT
+      # 🟢 COMMIT BACK TO GITHUB
       # =========================
 
-      - name: Commit & Push
+      - name: Commit & Push Changes
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
           git add backend/datastore-be.yaml frontend/datastore-fe.yaml
+
           git commit -m "Update images to $IMAGE_TAG" || echo "No changes"
+
           git push
