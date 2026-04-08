@@ -71,9 +71,9 @@ jobs:
           docker push $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG
 
           # -------- UPDATE YAML --------
-          sed -i "s|image:.*datastore-backend.*|image: $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG|g" placement-project1/deployment/backend/datastore-be.yaml
+          sed -i "s|image:.*datastore-backend.*|image: $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG|g" deployment/backend/datastore-be.yaml
 
-          sed -i "s|image:.*datastore-frontend.*|image: $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG|g" placement-project1/deployment/frontend/datastore-fe.yaml
+          sed -i "s|image:.*datastore-frontend.*|image: $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG|g" deployment/frontend/datastore-fe.yaml
 
       # -------------------------
       # Commit YAML changes
@@ -83,8 +83,8 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          git add placement-project1/deployment/backend/datastore-be.yaml
-          git add placement-project1/deployment/frontend/datastore-fe.yaml
+          git add deployment/backend/datastore-be.yaml
+          git add deployment/frontend/datastore-fe.yaml
 
           git commit -m "Update images to $GITHUB_SHA [skip ci]" || echo "No changes"
           git push
