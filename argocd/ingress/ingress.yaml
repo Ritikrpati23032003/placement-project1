@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/Ritikrpati23032003/placement-project1.git
     targetRevision: main
-    path: netwroking  # 👈 network folder
+    path: netwroking/ingress.yaml # 👈 network folder
 
   destination:
     server: https://kubernetes.default.svc
