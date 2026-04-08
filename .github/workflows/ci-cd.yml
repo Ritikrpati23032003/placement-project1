@@ -147,3 +147,4 @@ jobs:
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dispatches \
             -d '{"event_type": "argocd-deploy"}'
+
