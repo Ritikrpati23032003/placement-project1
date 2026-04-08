@@ -1,4 +1,4 @@
-name: Update Image with Scan (FE + BE)
+name: Full CI/CD (ECR + Scan + Update Manifest)
 
 on:
   push:
@@ -9,16 +9,17 @@ permissions:
   contents: write
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ACCOUNT_ID: ${{ vars.ACCOUNT_ID }}
   FE_REPO: frontend
   BE_REPO: backend
 
 jobs:
-  update-image:
+  pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      # ✅ 1. Checkout
+      # ✅ 1. Checkout Code
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -30,24 +31,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ 3. Login to ECR
+      # ✅ 3. Create ECR Repositories (if not exist)
+      - name: Create ECR Repos
+        run: |
+          aws ecr describe-repositories --repository-names $BE_REPO || \
+          aws ecr create-repository --repository-name $BE_REPO
+
+          aws ecr describe-repositories --repository-names $FE_REPO || \
+          aws ecr create-repository --repository-name $FE_REPO
+
+      # ✅ 4. Login to ECR
       - name: Login to ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ✅ 4. Set Image Tag
+      # ✅ 5. Set Image Tag (Version)
       - name: Set Tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
       # =========================
-      # 🔷 BACKEND (DataStore)
+      # 🔷 BACKEND
       # =========================
 
-      # ✅ 5. Build Backend Image
       - name: Build Backend
         run: docker build -t $BE_REPO:$IMAGE_TAG ./DataStore
 
-      # ✅ 6. Scan Backend Image
       - name: Scan Backend
         uses: aquasecurity/trivy-action@master
         with:
@@ -55,22 +62,19 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 1
 
-      # ✅ 7. Push Backend Image
       - name: Push Backend
         run: |
           docker tag $BE_REPO:$IMAGE_TAG \
-          ${{ steps.login-ecr.outputs.registry }}/$BE_REPO:$IMAGE_TAG
-          docker push ${{ steps.login-ecr.outputs.registry }}/$BE_REPO:$IMAGE_TAG
+          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
+          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
 
       # =========================
-      # 🔷 FRONTEND (DataStoreFront)
+      # 🔷 FRONTEND
       # =========================
 
-      # ✅ 8. Build Frontend Image
       - name: Build Frontend
-        run: docker build -t $FE_REPO:$IMAGE_TAG -f DataStoreFront/Dockerfile-frontend ./DataStoreFront
+        run: docker build -t $FE_REPO:$IMAGE_TAG ./DataStoreFront
 
-      # ✅ 9. Scan Frontend Image
       - name: Scan Frontend
         uses: aquasecurity/trivy-action@master
         with:
@@ -78,26 +82,23 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 1
 
-      # ✅ 10. Push Frontend Image
       - name: Push Frontend
         run: |
           docker tag $FE_REPO:$IMAGE_TAG \
-          ${{ steps.login-ecr.outputs.registry }}/$FE_REPO:$IMAGE_TAG
-          docker push ${{ steps.login-ecr.outputs.registry }}/$FE_REPO:$IMAGE_TAG
+          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
+          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
 
       # =========================
-      # 🔥 UPDATE YAML FILES
+      # 🔥 UPDATE K8s MANIFESTS
       # =========================
 
-      # ✅ 11. Update Backend YAML
-      - name: Update BE YAML
+      - name: Update Backend YAML
         run: |
-          sed -i "s|image:.*backend.*|image: ${{ steps.login-ecr.outputs.registry }}/$BE_REPO:$IMAGE_TAG|g" backend/datastore-be.yaml
+          sed -i "s|image:.*backend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG|g" deployment/backend/datastore-be.yaml
 
-      # ✅ 12. Update Frontend YAML
-      - name: Update FE YAML
+      - name: Update Frontend YAML
         run: |
-          sed -i "s|image:.*frontend.*|image: ${{ steps.login-ecr.outputs.registry }}/$FE_REPO:$IMAGE_TAG|g" frontend/datastore-fe.yaml
+          sed -i "s|image:.*frontend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG|g" deployment/frontend/datastore-fe.yaml
 
       # =========================
       # 🟢 COMMIT BACK TO GITHUB
@@ -108,7 +109,7 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          git add backend/datastore-be.yaml frontend/datastore-fe.yaml
+          git add deployment/backend/datastore-be.yaml deployment/frontend/datastore-fe.yaml
 
           git commit -m "Update images to $IMAGE_TAG" || echo "No changes"
 
