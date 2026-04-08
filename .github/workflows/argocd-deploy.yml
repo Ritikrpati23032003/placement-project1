@@ -42,7 +42,7 @@ jobs:
 
       - name: Deploy Frontend
         run: |
-          kubectl apply -f argocd/frontend/argocd-frontend.yaml
+          kubectl apply -f argocd/frotnend/argocd-frontend.yaml
 
       - name: Deploy Ingress (ArgoCD App)
         run: |
