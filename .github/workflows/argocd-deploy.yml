@@ -37,8 +37,8 @@ jobs:
 
       - name: Deploy Backend
         run: |
-          kubectl apply -f deployment/backend/argocd-backend.yaml
+          kubectl apply -f argocd/backend/argocd-backend.yaml
 
       - name: Deploy Frontend
         run: |
-          kubectl apply -f deployment/frontend/argocd-frontend.yaml
+          kubectl apply -f argocd/frontend/argocd-frontend.yaml
