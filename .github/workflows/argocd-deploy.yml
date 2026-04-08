@@ -1,0 +1,44 @@
+name: argocd_deploy
+
+on:
+  repository_dispatch:
+    types: [argocd-deploy]   # ✅ triggered explicitly by ci-cd.yml
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug Trigger
+        run: |
+          echo "Triggered via repository_dispatch"
+          echo "SHA: ${{ github.sha }}"
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+      - name: Deploy Backend
+        run: |
+          kubectl apply -f deployment/backend/argocd-backend.yaml
+
+      - name: Deploy Frontend
+        run: |
+          kubectl apply -f deployment/frontend/argocd-frontend.yaml
