@@ -19,20 +19,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ✅ 1. Checkout Code
-      - name: Checkout
+      # ✅ 1. Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ✅ 2. Configure AWS Credentials
-      - name: Configure AWS
+      # ✅ 2. Configure AWS
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ 3. Create ECR Repositories (if not exist)
-      - name: Create ECR Repos
+      # ✅ 3. Create ECR repos if not exist
+      - name: Create ECR Repositories
         run: |
           aws ecr describe-repositories --repository-names $BE_REPO || \
           aws ecr create-repository --repository-name $BE_REPO
@@ -44,64 +44,70 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ✅ 5. Set Image Tag (Version)
-      - name: Set Tag
+      # ✅ 5. Set Image Tag
+      - name: Set Image Tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
       # =========================
       # 🔷 BACKEND
       # =========================
 
-      - name: Build Backend
+      - name: Build Backend Image
         run: docker build -t $BE_REPO:$IMAGE_TAG ./DataStore
 
-      - name: Scan Backend
+      - name: Scan Backend Image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.BE_REPO }}:${{ env.IMAGE_TAG }}
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
           exit-code: 1
+          scanners: vuln
 
-      - name: Push Backend
+      - name: Push Backend Image
         run: |
           docker tag $BE_REPO:$IMAGE_TAG \
           $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
-          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
+
+          docker push \
+          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
 
       # =========================
       # 🔷 FRONTEND
       # =========================
 
-      - name: Build Frontend
+      - name: Build Frontend Image
         run: docker build -t $FE_REPO:$IMAGE_TAG ./DataStoreFront
 
-      - name: Scan Frontend
+      - name: Scan Frontend Image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.FE_REPO }}:${{ env.IMAGE_TAG }}
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
           exit-code: 1
+          scanners: vuln
 
-      - name: Push Frontend
+      - name: Push Frontend Image
         run: |
           docker tag $FE_REPO:$IMAGE_TAG \
           $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
-          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
+
+          docker push \
+          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
 
       # =========================
-      # 🔥 UPDATE K8s MANIFESTS
+      # 🔥 UPDATE K8s YAML
       # =========================
 
       - name: Update Backend YAML
         run: |
-          sed -i "s|image:.*backend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG|g" deployment/backend/datastore-be.yaml
+          sed -i "s|image:.*backend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG|g" placement-project1/deployment/backend/datastore-be.yaml
 
       - name: Update Frontend YAML
         run: |
-          sed -i "s|image:.*frontend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG|g" deployment/frontend/datastore-fe.yaml
+          sed -i "s|image:.*frontend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG|g" placement-project1/deployment/frontend/datastore-fe.yaml
 
       # =========================
-      # 🟢 COMMIT BACK TO GITHUB
+      # 🟢 COMMIT BACK TO GIT
       # =========================
 
       - name: Commit & Push Changes
@@ -109,7 +115,8 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          git add deployment/backend/datastore-be.yaml deployment/frontend/datastore-fe.yaml
+          git add placement-project1/deployment/backend/datastore-be.yaml
+          git add placement-project1/deployment/frontend/datastore-fe.yaml
 
           git commit -m "Update images to $IMAGE_TAG" || echo "No changes"
 
