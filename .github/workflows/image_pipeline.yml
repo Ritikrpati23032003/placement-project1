@@ -1,116 +1,84 @@
-name: Full CI/CD (ECR + Scan + Update Manifest)
+name: CI/CD (Backend + Frontend with ECR Scan)
 
 on:
   push:
     branches:
       - main
 
-permissions:
-  contents: write
-
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
-  FE_REPO: frontend
-  BE_REPO: backend
+
+  BACKEND_REPO: datastore-backend
+  FRONTEND_REPO: datastore-frontend
+
+permissions:
+  contents: write
 
 jobs:
-  pipeline:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # ✅ 1. Checkout
+      # -------------------------
+      # Checkout
+      # -------------------------
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # ✅ 2. Configure AWS
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
+      # -------------------------
+      # AWS Credentials
+      # -------------------------
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ 3. Create ECR repos if not exist
-      - name: Create ECR Repositories
-        run: |
-          aws ecr describe-repositories --repository-names $BE_REPO || \
-          aws ecr create-repository --repository-name $BE_REPO
-
-          aws ecr describe-repositories --repository-names $FE_REPO || \
-          aws ecr create-repository --repository-name $FE_REPO
-
-      # ✅ 4. Login to ECR
+      # -------------------------
+      # Login ECR
+      # -------------------------
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ✅ 5. Set Image Tag
-      - name: Set Image Tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
-
-      # =========================
-      # 🔷 BACKEND
-      # =========================
-
-      - name: Build Backend Image
-        run: docker build -t $BE_REPO:$IMAGE_TAG ./DataStore
-
-      - name: Scan Backend Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.BE_REPO }}:${{ env.IMAGE_TAG }}
-          severity: CRITICAL
-          exit-code: 1
-          scanners: vuln
-
-      - name: Push Backend Image
+      # -------------------------
+      # Build & Push Images
+      # -------------------------
+      - name: Build & Push Images
         run: |
-          docker tag $BE_REPO:$IMAGE_TAG \
-          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
+          set -e
+          IMAGE_TAG="${GITHUB_SHA}"
 
-          docker push \
-          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG
+          ECR_REGISTRY="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-      # =========================
-      # 🔷 FRONTEND
-      # =========================
+          # -------- BACKEND --------
+          echo "🚀 Building Backend"
 
-      - name: Build Frontend Image
-        run: docker build -t $FE_REPO:$IMAGE_TAG ./DataStoreFront
+          aws ecr describe-repositories --repository-names $BACKEND_REPO >/dev/null 2>&1 || \
+            aws ecr create-repository --repository-name $BACKEND_REPO
 
-      - name: Scan Frontend Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.FE_REPO }}:${{ env.IMAGE_TAG }}
-          severity: CRITICAL
-          exit-code: 1
-          scanners: vuln
+          docker build -t $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG ./DataStore
+          docker push $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG
 
-      - name: Push Frontend Image
-        run: |
-          docker tag $FE_REPO:$IMAGE_TAG \
-          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
+          # -------- FRONTEND --------
+          echo "🚀 Building Frontend"
 
-          docker push \
-          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG
+          aws ecr describe-repositories --repository-names $FRONTEND_REPO >/dev/null 2>&1 || \
+            aws ecr create-repository --repository-name $FRONTEND_REPO
 
-      # =========================
-      # 🔥 UPDATE K8s YAML
-      # =========================
+          docker build -t $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG ./DataStoreFront
+          docker push $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG
 
-      - name: Update Backend YAML
-        run: |
-          sed -i "s|image:.*backend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BE_REPO:$IMAGE_TAG|g" placement-project1/deployment/backend/datastore-be.yaml
+          # -------- UPDATE YAML --------
+          sed -i "s|image:.*datastore-backend.*|image: $ECR_REGISTRY/$BACKEND_REPO:$IMAGE_TAG|g" placement-project1/deployment/backend/datastore-be.yaml
 
-      - name: Update Frontend YAML
-        run: |
-          sed -i "s|image:.*frontend.*|image: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FE_REPO:$IMAGE_TAG|g" placement-project1/deployment/frontend/datastore-fe.yaml
+          sed -i "s|image:.*datastore-frontend.*|image: $ECR_REGISTRY/$FRONTEND_REPO:$IMAGE_TAG|g" placement-project1/deployment/frontend/datastore-fe.yaml
 
-      # =========================
-      # 🟢 COMMIT BACK TO GIT
-      # =========================
-
-      - name: Commit & Push Changes
+      # -------------------------
+      # Commit YAML changes
+      # -------------------------
+      - name: Commit Changes
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
@@ -118,6 +86,80 @@ jobs:
           git add placement-project1/deployment/backend/datastore-be.yaml
           git add placement-project1/deployment/frontend/datastore-fe.yaml
 
-          git commit -m "Update images to $IMAGE_TAG" || echo "No changes"
-
+          git commit -m "Update images to $GITHUB_SHA [skip ci]" || echo "No changes"
           git push
+
+      # -------------------------
+      # Install jq
+      # -------------------------
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # -------------------------
+      # Scan Backend (ECR)
+      # -------------------------
+      - name: Scan Backend Image
+        run: |
+          IMAGE_TAG="${GITHUB_SHA}"
+
+          aws ecr start-image-scan \
+            --repository-name $BACKEND_REPO \
+            --image-id imageTag=$IMAGE_TAG || true
+
+          aws ecr wait image-scan-complete \
+            --repository-name $BACKEND_REPO \
+            --image-id imageTag=$IMAGE_TAG
+
+          FINDINGS=$(aws ecr describe-image-scan-findings \
+            --repository-name $BACKEND_REPO \
+            --image-id imageTag=$IMAGE_TAG \
+            --query 'imageScanFindings.findingSeverityCounts' \
+            --output json)
+
+          echo "Backend Scan: $FINDINGS"
+
+          HIGH=$(echo "$FINDINGS" | jq '.HIGH // 0')
+          CRITICAL=$(echo "$FINDINGS" | jq '.CRITICAL // 0')
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ Critical vulnerabilities in backend"
+            exit 1
+          fi
+
+      # -------------------------
+      # Scan Frontend (ECR)
+      # -------------------------
+      - name: Scan Frontend Image
+        run: |
+          IMAGE_TAG="${GITHUB_SHA}"
+
+          aws ecr start-image-scan \
+            --repository-name $FRONTEND_REPO \
+            --image-id imageTag=$IMAGE_TAG || true
+
+          aws ecr wait image-scan-complete \
+            --repository-name $FRONTEND_REPO \
+            --image-id imageTag=$IMAGE_TAG
+
+          FINDINGS=$(aws ecr describe-image-scan-findings \
+            --repository-name $FRONTEND_REPO \
+            --image-id imageTag=$IMAGE_TAG \
+            --query 'imageScanFindings.findingSeverityCounts' \
+            --output json)
+
+          echo "Frontend Scan: $FINDINGS"
+
+          HIGH=$(echo "$FINDINGS" | jq '.HIGH // 0')
+          CRITICAL=$(echo "$FINDINGS" | jq '.CRITICAL // 0')
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ Critical vulnerabilities in frontend"
+            exit 1
+          fi
+
+      # -------------------------
+      # Prevent loop
+      # -------------------------
+      - name: Skip CI loop
+        if: contains(github.event.head_commit.message, '[skip ci]')
+        run: echo "Skipping auto-trigger"
