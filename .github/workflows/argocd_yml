@@ -1,0 +1,47 @@
+name: ArgoCD Deployment
+
+on:
+  workflow_run:
+    workflows: ["Image Pipeline"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Configure AWS
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region: ${{ env.AWS_REGION }}
+
+      # Setup kubectl
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      # Generate kubeconfig dynamically
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+      # Deploy Backend
+      - name: Apply Backend
+        run: |
+          kubectl apply -f backend/argocd-backend.yaml
+
+      # Deploy Frontend
+      - name: Apply Frontend
+        run: |
+          kubectl apply -f frontend/argocd-frontend.yaml
