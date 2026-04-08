@@ -44,9 +44,6 @@ jobs:
         run: |
           kubectl apply -f argocd/frotnend/argocd-frontend.yaml
 
-      - name: Deploy Ingress (ArgoCD App)
-        run: |
-          kubectl apply -f argocd/ingress/ingress.yaml
 
       # ✅ Install NGINX Ingress Controller (if not already)
       - name: Install NGINX Ingress Controller
