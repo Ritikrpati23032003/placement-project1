@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: datastore-backend
-          image: 657753403075.dkr.ecr.us-east-1.amazonaws.com/backend:73777a259d23e099a498b9e3d2000beec704cda1
+          image: 657753403075.dkr.ecr.us-east-1.amazonaws.com/backend:3bc991b30272e9069c395bde79981c7cb7cfaaea
           env:
             - name: MYSQL_HOST
               valueFrom:
