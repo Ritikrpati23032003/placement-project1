@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: mywebapp
-          image: 657753403075.dkr.ecr.us-east-1.amazonaws.com/frontend:3bc991b30272e9069c395bde79981c7cb7cfaaea
+          image: 657753403075.dkr.ecr.us-east-1.amazonaws.com/frontend:7e5f227dd7a66c7e417455e75ddd3db4c4c917aa
           env:
             - name: API_URL
               valueFrom:
