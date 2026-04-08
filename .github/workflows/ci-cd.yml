@@ -5,6 +5,7 @@ on:
     branches:
       - main
 
+
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
