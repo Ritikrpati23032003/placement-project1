@@ -1,0 +1,30 @@
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl edit svc argocd-server -n argocd
+
+kubectl get svc argocd-server -n argocd
+
+kubectl get secret argocd-initial-admin-secret -n argocd -o yaml
+
+Tjh4d2VZdmlGZlBtUzE1SQ==
+decode
+
+echo "bjZWT0E0M1ZpcUtDQVZjVA==" | base64 --decode
+N8xweYviFfPmS15I
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+
+change lb at ingress.yaml
+---------------------------------------------------------#----------------------------------------------------------------
+secret & variable
+
+ACCOUNT_ID
+
+AWS_ACCESS_KEY_ID
+
+AWS_REGION
+
+AWS_SECRET_ACCESS_KEY
+
+EKS_CLUSTER_NAME
